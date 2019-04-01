@@ -13,21 +13,21 @@
  * @param  {count} int          The maximum number of items to return; defaults to 200.
  * @param  {use_snippet} boolean If true, the item snippet is appended after the hyperlink. Defaults to true.  
  */
-function ListDataByTag(ID, group, type, tag, typeKeywords, trim_title, prefix, link_to, count, use_snippet) {
+function ListData(ID, group, type, tag, typeKeywords, trim_title, prefix, link_to, count, use_snippet) {
   $(document).ready(function() {
     // And now the query
     var query = 'https://www.arcgis.com/sharing/rest/search?q=group:' + group;
     // Add type
     if (type != null) {
-    	query += '+type:' + type;
+      query += '+type:' + type;
     }
     // Add tags
     if (tag != null) {
-    	query += '+tags:' + tag;
+      query += '+tags:' + tag;
     }
     // Add typeKeywords
     if (typeKeywords != null) {
-    	query += '+typekeywords:' + typeKeywords;
+      query += '+typekeywords:' + typeKeywords;
     }
     // Add end to query
     query += '&num=' + count + '&sortField=title&f=pjson';
@@ -40,35 +40,35 @@ function ListDataByTag(ID, group, type, tag, typeKeywords, trim_title, prefix, l
         // Any value available in the query JSON can be appended
         // Title for item
         if (trim_title == true) {
-        	// Trim prefix from title, along with any leading whitespace or hyphens
-        		/**
-				* Remove chars from beginning of string.
-				* https://gist.github.com/jonlabelle/5375315
-				*/
-				function ltrim(str, chars) {
-				  chars = chars || WHITE_SPACES;
+          // Trim prefix from title, along with any leading whitespace or hyphens
+            /**
+        * Remove chars from beginning of string.
+        * https://gist.github.com/jonlabelle/5375315
+        */
+        function ltrim(str, chars) {
+          chars = chars || WHITE_SPACES;
 
-				  var start = 0,
-				      len = str.length,
-				      charLen = chars.length,
-				      found = true,
-				      i, c;
+          var start = 0,
+              len = str.length,
+              charLen = chars.length,
+              found = true,
+              i, c;
 
-				  while (found && start < len) {
-				      found = false;
-				      i = -1;
-				      c = str.charAt(start);
+          while (found && start < len) {
+              found = false;
+              i = -1;
+              c = str.charAt(start);
 
-				      while (++i < charLen) {
-				          if (c === chars[i]) {
-				              found = true;
-				              start++;
-				              break;
-				          }
-				      }
-				  }
-				  return (start >= len) ? '' : str.substr(start, len);
-				}
+              while (++i < charLen) {
+                  if (c === chars[i]) {
+                      found = true;
+                      start++;
+                      break;
+                  }
+              }
+          }
+          return (start >= len) ? '' : str.substr(start, len);
+        }
           var title = ltrim(val.title.replace(prefix, '').trim(), "-").trim();
         }
         else {
@@ -79,35 +79,76 @@ function ListDataByTag(ID, group, type, tag, typeKeywords, trim_title, prefix, l
         else {var snippet = ' - ' + val.snippet}
         if (use_snippet == false) {var snippet = ''}
         // Build list with links
-    	// For non-feature service items, link directly to item
-    	if (type != 'feature_service') {
-    		// Dashboards get different link
-  			if (type == 'dashboard') {
-  				$ListData.append('<li><a href="https://maine.maps.arcgis.com/apps/opsdashboard/index.html#/' 
-  									+ val.id + '">' + title + '</a>' + snippet + '</li>');
-  			}
-  			else {
-    			$ListData.append('<li><a href="' + val.url+ '">' + title + '</a>' + snippet + '</li>');
-    		}
-    	}
-        else if (link_to == 'open_data') {
-          $ListData.append('<li><a href="https://dmr-maine.opendata.arcgis.com/datasets/' 
-                            + val.title.replace(' - ', ' ').replace(/ /g, '-').toLowerCase() + '">' 
-                            + title + '</a>' + snippet + '</li>');
-        }
-        else if (link_to == 'item_page') {
-          $ListData.append('<li><a href="' + val.url + '">' + title + '</a>' + snippet + '</li>');
-        }
-        else if (link_to == 'direct') {
-          if (val.typeKeywords.includes("Table")) {
-            $ListData.append('<li><a href="https://opendata.arcgis.com/datasets/' + val.id + '_0.csv' + '"">' 
-                              + title + '</a>' + snippet + '</li>');
+      var url;
+      var link_str;
+      // Function to return link string to feature service
+      function GetURL(link_to, item_url, id, layer_id, title, snippet) {
+        if (link_to == 'open_data') {
+            url = 'https://dmr-maine.opendata.arcgis.com/datasets/' + id + '_' + layer_id;
+            link_str = '<li><a data-name="' + title + '" href="' + url + '">' + title + '</a>' + snippet + '</li>';
           }
-          else {
-            $ListData.append('<li><a href="https://opendata.arcgis.com/datasets/' + val.id + '_4.zip' + '"">' 
-                              + title + '</a>' + snippet + '</li>');
-          }          
+          else if (link_to == 'item_page') {
+            url = val.url;
+            link_str = '<li><a data-name="' + title + '" href="' + item_url + '">' + title + '</a>' + snippet + '</li>';
+          }
+          else if (link_to == 'direct') {
+            if (val.typeKeywords.includes("Table")) {
+              url = 'https://opendata.arcgis.com/datasets/' + id + '_' + layer_id + '.csv';
+              link_str = '<li><a data-name="' + title + '" href="' + url + '"">' + title + '</a>' + snippet + '</li>';
+            }
+            else {
+              url = 'https://opendata.arcgis.com/datasets/' + id + '_' + layer_id + '.zip';
+              link_str = '<li><a data-name="' + title + '" href="' + url + '"">' + title + '</a>' + snippet + '</li>';
+            }          
+          }
+          return link_str
+      };
+      // Function to build links for multilayer feature services
+      function MultiLayer(item_url, item_id) {
+        var query = item_url + '?f=pjson';
+        $.getJSON(query, function(data) {
+            $.each(data.layers, function(key, val) {
+              if (trim_title == true) {
+                var title = ltrim(val.name.replace(prefix, '').trim(), "-").trim();
+              }
+              else {
+                var title = val.name;
+              }
+              link_str = GetURL(link_to, item_url, id = item_id, layer_id = val.id, title, snippet);
+              $ListData.append(link_str);
+            });
+          });
+      };
+      // If type is feature service, get layer ID from URL
+      if (val.type == 'Feature Service') {
+        // If feature service has multiple layers
+        if (val.typeKeywords.includes("Multilayer")) {
+          MultiLayer(val.url, val.id);
+          return true;
         }
+        var url_split = val.url.split('/');
+        var layer_id = url_split[url_split.length - 1];
+        if (layer_id == 'FeatureServer' || layer_id == 'MapServer') {
+          layer_id = 0;
+        };
+      }
+      // For non-feature service items, link directly to item
+      if (val.type != 'Feature Service') {
+        // Dashboards get different link
+        if (val.type == 'Dashboard') {
+          url = 'https://maine.maps.arcgis.com/apps/opsdashboard/index.html#/' + val.id;
+          link_str = '<li><a data-name="' + title + '" href="' + url +  '">' + title + '</a>' + snippet + '</li>';
+        }
+        else {
+          url = val.url;
+          link_str = '<li><a data-name="' + title + '" href="' + val.url + '">' + title + '</a>' + snippet + '</li>';
+        }
+      }
+        else { // Feature service single layer, pass to GetURL
+          link_str = GetURL(link_to, item_url = val.url, id = val.id, layer_id, title, snippet);
+        }
+        // Append to list
+        $ListData.append(link_str);
       })
     });
   });
