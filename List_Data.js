@@ -1,3 +1,21 @@
+// Internet Explorer still does not support Array.prototype.includes()
+// Polyfill these methods to support IE
+// See: https://stackoverflow.com/questions/31221341/ie-does-not-support-includes-method
+//
+// Polyfill Array.prototype.includes() method
+if (!Array.prototype.includes) {
+  Object.defineProperty(Array.prototype, "includes", {
+    enumerable: false,
+    value: function(obj) {
+        var newArr = this.filter(function(el) {
+          return el == obj;
+        });
+        return newArr.length > 0;
+    }
+  });
+}
+
+
 /**
  * Populates an HTML list with ArcGIS Online items from a group matching type, tag, and tagKeyword parameters.
  see https://developers.arcgis.com/rest/users-groups-and-items/search-reference.htm for more information on search queries.
